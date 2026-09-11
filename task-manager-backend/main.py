@@ -6,7 +6,11 @@ from app.controllers.task_controller import router as task_router
 # instance of fastapi
 app = FastAPI(title="Task Manager API", version="1.0.0")
 
+<<<<<<< HEAD
 # CORS Middleware
+=======
+
+>>>>>>> c6af48ce884fd0b5291ab53c3a4a1e88eb8bb9b8
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,7 +19,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+<<<<<<< HEAD
 # Startup event for db
+=======
+# for mongodb connection 
+username = os.getenv("MONGO_USER", "saniya")
+password = quote_plus(os.getenv("MONGO_PASS", "Saniya9873"))
+
+MONGO_URI = os.getenv(
+    "MONGO_URI",
+    f"mongodb+srv://{username}:{password}@cluster0.ycbkb6b.mongodb.net/?appName=Cluster0"
+)
+# accessing database
+client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+db = client.task_db
+
+# runs everytime when server starts
+>>>>>>> c6af48ce884fd0b5291ab53c3a4a1e88eb8bb9b8
 @app.on_event("startup")
 async def startup_db_client():
     try:
@@ -24,9 +44,95 @@ async def startup_db_client():
     except Exception as e:
         print(f"[ERROR] MongoDB Connection Failed: {e}")
 
+<<<<<<< HEAD
 # Include Controllers/Routers
 app.include_router(task_router)
+=======
+# for validating input type using basemodel 
+class TaskCreateSchema(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = ""
+    priority: Literal["low", "medium", "high"] = "medium"
+    completed: bool = False
 
+# returning output in dict form
+def task_helper(task) -> dict:
+    return {
+        "id": str(task["_id"]),
+        "title": task.get("title", ""),
+        "description": task.get("description", ""),
+        "priority": task.get("priority", "medium"),
+        "completed": bool(task.get("completed", False)),
+        "created_at": task.get("created_at", "")
+    }
+>>>>>>> c6af48ce884fd0b5291ab53c3a4a1e88eb8bb9b8
+
+# main route
 @app.get("/")
 async def root():
+<<<<<<< HEAD
     return {"message": "Task Manager API is running", "docs": "/docs"}
+=======
+    return {"message": "Task Manager API is running", "docs": "/docs"}
+
+# fetch task from database and count tasks in each section
+@app.get("/tasks")
+@app.get("/tasks")
+async def get_tasks():
+    tasks = []
+    # Sort tasks in descending order 
+    async for task in db.tasks.find().sort("_id", -1):
+        tasks.append(task_helper(task))
+    
+    total = len(tasks)
+    completed = sum(1 for t in tasks if t["completed"])
+    left = total - completed
+    
+    return {
+        "tasks": tasks,
+        "counts": {
+            "total": total,
+            "completed": completed,
+            "left": left
+        }
+    }
+
+
+# creats task and save it in db
+@app.post("/tasks", status_code=status.HTTP_201_CREATED)
+async def create_task(task: TaskCreateSchema):
+    task_dict = task.dict()
+    task_dict["created_at"] = datetime.utcnow().isoformat()
+    new_task = await db.tasks.insert_one(task_dict)
+    created_task = await db.tasks.find_one({"_id": new_task.inserted_id})
+    return task_helper(created_task)
+
+# update status of task 
+@app.put("/tasks/{task_id}")
+async def toggle_task(task_id: str):
+    if not ObjectId.is_valid(task_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task ID format")
+        
+    task = await db.tasks.find_one({"_id": ObjectId(task_id)})
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    
+    updated_status = not task.get("completed", False)
+    await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": {"completed": updated_status}})
+    
+    updated_task = await db.tasks.find_one({"_id": ObjectId(task_id)})
+    return {
+        "message": "Status updated",
+        "task": task_helper(updated_task)
+    }
+# this func helps in deleting task
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: str):
+    if not ObjectId.is_valid(task_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task ID format")
+
+    result = await db.tasks.delete_one({"_id": ObjectId(task_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return {"message": "Task deleted successfully", "id": task_id}
+>>>>>>> c6af48ce884fd0b5291ab53c3a4a1e88eb8bb9b8
