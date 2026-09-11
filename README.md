@@ -1,5 +1,4 @@
 # Task-Manager
-# Task Manager
 
 A full-stack Task Manager web application to create, organize, and track daily tasks. The application provides a simple frontend connected to a FastAPI backend and MongoDB database.
 
