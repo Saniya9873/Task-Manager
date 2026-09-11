@@ -8,9 +8,10 @@ from typing import Optional, Literal
 from datetime import datetime
 import os
 
+# instance of fastapi
 app = FastAPI(title="Task Manager API", version="1.0.0")
 
-# Enable CORS for frontend
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,6 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# for mongodb connection 
 username = os.getenv("MONGO_USER", "saniya")
 password = quote_plus(os.getenv("MONGO_PASS", "Saniya9873"))
 
@@ -26,10 +28,11 @@ MONGO_URI = os.getenv(
     "MONGO_URI",
     f"mongodb+srv://{username}:{password}@cluster0.ycbkb6b.mongodb.net/?appName=Cluster0"
 )
-
+# accessing database
 client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 db = client.task_db
 
+# runs everytime when server starts
 @app.on_event("startup")
 async def startup_db_client():
     try:
@@ -38,12 +41,14 @@ async def startup_db_client():
     except Exception as e:
         print(f"[ERROR] MongoDB Connection Failed: {e}")
 
+# for validating input type using basemodel 
 class TaskCreateSchema(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = ""
     priority: Literal["low", "medium", "high"] = "medium"
     completed: bool = False
 
+# returning output in dict form
 def task_helper(task) -> dict:
     return {
         "id": str(task["_id"]),
@@ -54,14 +59,17 @@ def task_helper(task) -> dict:
         "created_at": task.get("created_at", "")
     }
 
+# main route
 @app.get("/")
 async def root():
     return {"message": "Task Manager API is running", "docs": "/docs"}
 
+# fetch task from database and count tasks in each section
+@app.get("/tasks")
 @app.get("/tasks")
 async def get_tasks():
     tasks = []
-    # Sort tasks descending by creation / _id
+    # Sort tasks in descending order 
     async for task in db.tasks.find().sort("_id", -1):
         tasks.append(task_helper(task))
     
@@ -78,6 +86,8 @@ async def get_tasks():
         }
     }
 
+
+# creats task and save it in db
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
 async def create_task(task: TaskCreateSchema):
     task_dict = task.dict()
@@ -86,6 +96,7 @@ async def create_task(task: TaskCreateSchema):
     created_task = await db.tasks.find_one({"_id": new_task.inserted_id})
     return task_helper(created_task)
 
+# update status of task 
 @app.put("/tasks/{task_id}")
 async def toggle_task(task_id: str):
     if not ObjectId.is_valid(task_id):
@@ -103,7 +114,7 @@ async def toggle_task(task_id: str):
         "message": "Status updated",
         "task": task_helper(updated_task)
     }
-
+# this func helps in deleting task
 @app.delete("/tasks/{task_id}")
 async def delete_task(task_id: str):
     if not ObjectId.is_valid(task_id):
